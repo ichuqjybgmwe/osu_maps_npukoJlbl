@@ -5,7 +5,16 @@ on:
     branches: [main, 'claude/**']
     tags: ['v*']
   pull_request:
+  # Публикация релиза на GitHub (тег может называться как угодно) — файлы прикрепятся к нему.
+  release:
+    types: [published]
+  # Ручной запуск: можно указать тег уже существующего релиза, чтобы дозагрузить в него файлы.
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Тег релиза, к которому прикрепить файлы (пусто — только собрать)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -47,10 +56,11 @@ jobs:
             dist/MapVault-*-win-x64.zip
             dist/MapVault-Setup-*.exe
 
-      - name: Релиз (для тегов v*)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Файлы в релиз
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release_tag || github.event.release.tag_name || github.ref_name }}
           files: |
             dist/MapVault-*-win-x64.zip
             dist/MapVault-Setup-*.exe
