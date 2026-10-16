@@ -1,0 +1,56 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Версия Node фиксирована: blob SEA внедряется в node.exe ровно этой версии.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.0'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Тесты
+        run: npm test
+
+      - name: Сборка MapVault.exe
+        run: npm run build:win
+
+      - name: Смоук-тест exe на Windows
+        run: node scripts/smoke-test.mjs --exe=dist/MapVault-0.1.0-win-x64/MapVault.exe
+
+      - name: Установщик (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          & $iscc installer\mapvault.iss
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MapVault-windows
+          path: |
+            dist/MapVault-*-win-x64.zip
+            dist/MapVault-Setup-*.exe
+
+      - name: Релиз (для тегов v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/MapVault-*-win-x64.zip
+            dist/MapVault-Setup-*.exe

@@ -51,7 +51,15 @@ class Logger {
     const line = `${ts} ${level.toUpperCase().padEnd(5)} [${scope}] ${msg}${detail}`;
     this.ring.push({ ts, level, scope, msg: msg + detail });
     if (this.ring.length > RING_SIZE) this.ring.shift();
-    if (this.console) (level === 'error' ? console.error : console.log)(line);
+    if (this.console) {
+      // Без консоли (запуск без окна, сломанные дескрипторы) запись может бросить
+      // исключение — журнал не должен ронять приложение, остаётся файл.
+      try {
+        (level === 'error' ? console.error : console.log)(line);
+      } catch {
+        this.console = false;
+      }
+    }
     if (this.file) {
       this.rotateIfNeeded();
       try { fs.appendFileSync(this.file, line + '\n'); } catch { /* диск недоступен — не роняем приложение */ }

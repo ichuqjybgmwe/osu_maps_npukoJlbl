@@ -111,7 +111,7 @@ function connectEvents() {
     let data = null;
     try { data = JSON.parse(ev.data); } catch { /* ignore */ }
     if (type === 'tosu') paintTosu({ ...data, enabled: ctx.status?.tosu?.enabled });
-    if (type === 'indexer' && ctx.status) {
+    if (type === 'indexer' && data && ctx.status) {
       ctx.status.indexer = data;
       paintStatus(ctx.status);
     }
@@ -119,6 +119,7 @@ function connectEvents() {
       const gain = data.gain?.gain;
       toast(`Сохранён результат: ${data.title || ''} ${data.mods || 'NM'} ${data.accuracy?.toFixed(2)}% — ${fmt.pp(data.pp)}${gain != null ? (gain > 0.05 ? `, ≈ +${gain.toFixed(1)}pp к профилю` : ', в профиль не идёт') : ''}`);
     }
+    if (type === 'indexer' && !data) return;
     for (const fn of listeners.get(type) || []) {
       try { fn(data); } catch (e) { console.error(e); }
     }

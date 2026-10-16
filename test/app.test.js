@@ -80,6 +80,15 @@ test('2. профиль из osu! API: снимок, top plays, recent, без �
   assert.ok(top.rows.every((s) => Math.abs(s.pp_calc - s.pp) < 0.5), 'pp_calc ≈ pp');
 });
 
+test('2b. статусы локальных карт из osu! API; Farm не советует неранкнутые', async () => {
+  env.mock.state.extraLocal = env.songs.maps.slice(14).map((m, i) => ({ ...m, status: i % 2 ? 'loved' : 'ranked' }));
+  const r = await http('/api/songs/statuses', { method: 'POST' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const statuses = env.app.db.all('SELECT status, COUNT(*) AS n FROM beatmaps WHERE missing = 0 GROUP BY status');
+  assert.ok(statuses.some((x) => x.status === 'loved'), JSON.stringify(statuses));
+  assert.equal(statuses.find((x) => x.status === null), undefined, 'все карты с ID проверены');
+});
+
 test('3. Tosu: игра → результат в SQLite; повторный показ не дублирует; lifetime pp не растёт от слабого score', async () => {
   await waitFor(() => env.app.tosu.status.state === 'connected', { timeout: 8000 });
   const before = (await http('/api/profile')).data.lifetime;
@@ -172,6 +181,8 @@ test('7. Farm: анализ профиля и рекомендации с объ
     assert.ok(it.farmScore >= 0 && it.farmScore <= 100);
   }
   assert.equal(r.data.items[0].farmScore, 100);
+  const unranked = new Set(env.app.db.all("SELECT md5 FROM beatmaps WHERE status NOT IN ('ranked', 'approved')").map((x) => x.md5));
+  assert.ok(r.data.items.every((it) => !unranked.has(it.md5)), 'loved/graveyard карты не рекомендуются');
   const played = new Set(env.songs.maps.slice(0, 14).map((m) => m.md5));
   for (const it of r.data.items) {
     if (played.has(it.md5)) assert.ok(it.predictedPp > (it.existingPp || 0), 'на сыгранной карте рекомендуется только улучшение');

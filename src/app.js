@@ -157,6 +157,14 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
     indexer.scan({ force: !!body.force }).catch((e) => L.error('Сканирование', e));
     return indexer.status();
   });
+  router.post('/api/songs/statuses', async () => {
+    if (!api.configured()) throw new HttpError(400, 'Нужен osu! API, чтобы узнать статусы карт.');
+    try {
+      return await profile.syncBeatmapStatuses({ limit: 100000, force: true });
+    } catch (e) {
+      throw new HttpError(502, e.message);
+    }
+  });
   router.post('/api/songs/cancel', () => {
     indexer.cancel();
     return indexer.status();

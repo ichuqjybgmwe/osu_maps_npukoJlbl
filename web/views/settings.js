@@ -12,7 +12,7 @@ export async function settingsView(el, _p, ctx) {
         <label class="field mt">Папка osu!<input id="gameDir" value="${s.gameDir || ''}" placeholder="C:\\Users\\…\\AppData\\Local\\osu!"></label>
         <label class="field mt">Папка Songs<input id="songsDir" value="${s.songsDir || ''}" placeholder="C:\\Users\\…\\AppData\\Local\\osu!\\Songs"></label>
         <label class="row mt small"><input type="checkbox" id="autoScanOnStart" ${s.autoScanOnStart ? 'checked' : ''}> Сканировать новые карты при запуске</label>
-        <div class="row mt"><button id="scan">Сканировать</button><button id="rescan">Полный пересчёт</button><button id="cancel">Остановить</button></div>
+        <div class="row mt"><button id="scan">Сканировать</button><button id="rescan">Полный пересчёт</button><button id="cancel">Остановить</button><button id="statuses" title="Узнать ranked/loved/graveyard через osu! API">Статусы карт</button></div>
         <div class="mt" id="ix"></div>
         <div class="small muted mt">Поддерживается osu!stable (папка Songs с .osu-файлами). osu!lazer хранит карты в своей базе — его Songs не индексируются, но scores из lazer через Tosu и API сохраняются.</div>
       </div>
@@ -116,6 +116,17 @@ export async function settingsView(el, _p, ctx) {
   el.querySelector('#scan').addEventListener('click', scan(false));
   el.querySelector('#rescan').addEventListener('click', scan(true));
   el.querySelector('#cancel').addEventListener('click', () => api('/api/songs/cancel', { method: 'POST' }));
+  el.querySelector('#statuses').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try {
+      const r = await api('/api/songs/statuses', { method: 'POST' });
+      toast(r.busy ? 'Проверка статусов уже идёт' : `Проверено карт: ${r.checked}, обновлено: ${r.updated}`);
+    } catch (err) {
+      toast(err.message, 'bad');
+    } finally {
+      e.target.disabled = false;
+    }
+  });
   el.querySelector('#logout')?.addEventListener('click', async () => {
     await api('/api/osu/logout', { method: 'POST' });
     settingsView(el, _p, ctx);

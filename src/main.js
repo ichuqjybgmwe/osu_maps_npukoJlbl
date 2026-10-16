@@ -77,7 +77,11 @@ async function main() {
 
   const url = `http://localhost:${port}/`;
   L.info(`Готово: ${url}`);
-  console.log(`\n  MapVault работает: ${url}\n  Закройте это окно (или нажмите Ctrl+C), чтобы выйти.\n`);
+  try {
+    console.log(`\n  MapVault работает: ${url}\n  Закройте это окно (или нажмите Ctrl+C), чтобы выйти.\n`);
+  } catch {
+    // нет консоли
+  }
   app.startBackground({ tosuEnabled: args.noTosu ? false : undefined });
   if (args.browser && settings.openBrowser) openBrowser(url);
 
@@ -103,7 +107,6 @@ async function main() {
 
 main().catch((e) => {
   L.error('Запуск не удался', e);
-  console.error(e);
   // Окно консоли не должно мгновенно закрыться — пользователь должен увидеть ошибку.
   setTimeout(() => process.exit(1), process.platform === 'win32' ? 15000 : 0);
 });

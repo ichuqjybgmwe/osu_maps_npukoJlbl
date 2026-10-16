@@ -91,6 +91,7 @@ export class ProfileService {
       this.lastError = null;
       L.info(`Профиль ${user.username} обновлён: pp ${st.pp}, top ${best.length}, recent ${recent.length}, новых scores ${inserted}`);
       this.events?.emit('profile', { refreshedAt: fetchedAt });
+      this.syncBeatmapStatuses().catch((e) => L.warn(`Статусы карт: ${e.message}`));
       return { ok: true, user: user.username, pp: st.pp, top: best.length, recent: recent.length, inserted };
     } catch (e) {
       this.lastError = e.message;
@@ -102,6 +103,48 @@ export class ProfileService {
 
   user() {
     return this.db.getSetting('profile.user');
+  }
+
+  /**
+   * Ranked-статус локальных карт из osu! API (по 50 карт за запрос).
+   * Нужен Farm: pp дают только ranked/approved карты. Неранкнутые статусы
+   * перепроверяем раз в неделю — карта могла получить ранк.
+   */
+  async syncBeatmapStatuses({ limit = 2000, force = false } = {}) {
+    if (this.syncingStatuses) return { busy: true };
+    this.syncingStatuses = true;
+    try {
+      // force (кнопка в настройках) — перепроверить все неранкнутые сразу.
+      const weekAgo = force ? new Date(Date.now() + 1000).toISOString() : new Date(Date.now() - 7 * 86400000).toISOString();
+      const rows = this.db.all(
+        `SELECT DISTINCT beatmap_id FROM beatmaps WHERE missing = 0 AND beatmap_id IS NOT NULL
+           AND (status IS NULL OR (status NOT IN ('ranked', 'approved', 'loved') AND (status_checked_at IS NULL OR status_checked_at < ?)))
+         LIMIT ?`,
+        weekAgo, limit,
+      );
+      let updated = 0;
+      const now = new Date().toISOString();
+      for (let i = 0; i < rows.length; i += 50) {
+        const ids = rows.slice(i, i + 50).map((r) => r.beatmap_id);
+        const res = await this.api.beatmaps(ids);
+        const found = new Set();
+        for (const b of res?.beatmaps || []) {
+          found.add(b.id);
+          cacheApiBeatmap(this.db, b, b.beatmapset);
+          // Локальная версия могла устареть (другой md5) — статус всё равно относится к этой карте.
+          this.db.run('UPDATE beatmaps SET status = ?, status_checked_at = ? WHERE beatmap_id = ?', b.status, now, b.id);
+          updated++;
+        }
+        for (const id of ids) {
+          if (!found.has(id)) this.db.run("UPDATE beatmaps SET status = COALESCE(status, 'unknown'), status_checked_at = ? WHERE beatmap_id = ?", now, id);
+        }
+        this.events?.emit('indexer', null);
+      }
+      if (rows.length) L.info(`Статусы карт обновлены: ${updated} из ${rows.length}`);
+      return { checked: rows.length, updated };
+    } finally {
+      this.syncingStatuses = false;
+    }
   }
 
   /** Текущий список лучших: из API, если он есть, иначе локальный по сохранённым scores. */

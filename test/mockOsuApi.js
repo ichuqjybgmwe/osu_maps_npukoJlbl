@@ -67,6 +67,11 @@ export function createMockOsu({ playedMaps, remoteMaps = [], username = 'TestPla
         total: remoteMaps.length,
       });
     }
+    if (p === '/beatmaps') {
+      const ids = url.searchParams.getAll('ids[]').map(Number);
+      const all = [...playedMaps, ...(state.extraLocal || [])];
+      return json(200, { beatmaps: all.filter((m) => ids.includes(m.beatmapId)).map((m, i) => ({ id: m.beatmapId, checksum: m.md5, beatmapset_id: m.setId, version: m.version || 'Hard', mode_int: 0, status: m.status || (i % 5 === 4 ? 'graveyard' : 'ranked'), difficulty_rating: 4 })) });
+    }
     if (p.startsWith('/beatmaps/')) return json(404, { error: 'not found' });
     return json(404, { error: `mock: ${p}` });
   }
