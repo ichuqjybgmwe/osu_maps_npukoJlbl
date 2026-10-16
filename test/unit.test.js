@@ -1,5 +1,6 @@
 // Модульные тесты: моды, парсер .osu, математика pp, поиск, калькулятор.
 import { test } from 'node:test';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { parseMods, modsToString, modsToBits, modsRate, difficultyMods } from '../src/pp/mods.js';
 import { parseOsuFile } from '../src/songs/osuParser.js';
@@ -137,6 +138,6 @@ test('Farm: модель точности падает со звёздами', (
 });
 
 test('папка данных: переменная окружения и платформы', () => {
-  assert.equal(resolveDataDir({ MAPVAULT_DATA: '/x/y' }, 'linux'), '/x/y');
+  assert.equal(resolveDataDir({ MAPVAULT_DATA: '/x/y' }, 'linux'), path.resolve('/x/y'));
   assert.match(resolveDataDir({ APPDATA: 'C:\\Users\\a\\AppData\\Roaming' }, 'win32'), /MapVault$/);
 });
