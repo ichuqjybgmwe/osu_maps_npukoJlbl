@@ -1,5 +1,6 @@
 // Точка входа: и для `npm start`, и для собранного MapVault.exe.
 // Запускает локальный сервер, подключение к Tosu и открывает браузер.
+import './bootstrap.js'; // должен быть первым: WASM калькулятора внутри exe, фильтр предупреждений
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';

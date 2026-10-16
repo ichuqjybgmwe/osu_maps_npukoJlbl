@@ -26,7 +26,7 @@ export async function mapView(el, { md5, beatmapId, query }, ctx) {
     const e = m?.eff;
     const st = d.attemptStats;
     el.innerHTML = html`
-      ${m ? html`<div class="bg-banner" style="background-image:url('/api/beatmaps/${md5}/background')"></div>` : ''}
+      ${m ? html`<div class="bg-banner" id="banner" hidden></div>` : ''}
       <h1>${title} <span class="muted">[${version}]</span></h1>
       <div class="row mb small">
         ${m?.creator || a?.creator ? html`<span class="muted">map by ${m?.creator || a?.creator}</span>` : ''}
@@ -68,6 +68,13 @@ export async function mapView(el, { md5, beatmapId, query }, ctx) {
           ${d.attempts.map((x) => html`<tr><td>${outcome(x.outcome)}</td><td class="num">${x.progress != null ? Math.round(x.progress * 100) + '%' : '—'}</td><td class="num">${fmt.acc(x.accuracy)}</td><td class="num">${fmt.num(x.max_combo)}</td><td class="num">${x.nmiss ?? '—'}</td><td>${fmt.mods(x.mods)}</td><td class="muted small">${fmt.date(x.started_at)}</td></tr>`)}
           </table></div>` : html`<div class="empty">Попыток не записано (они пишутся через Tosu).</div>`}
       </div>`;
+    const banner = el.querySelector('#banner');
+    if (banner) {
+      // Фон показываем, только если он реально есть в папке карты.
+      const img = new Image();
+      img.onload = () => { banner.style.backgroundImage = `url('${img.src}')`; banner.hidden = false; };
+      img.src = `/api/beatmaps/${md5}/background`;
+    }
     el.querySelectorAll('[data-mod]').forEach((c) => c.addEventListener('click', () => {
       const x = c.dataset.mod;
       let list = mods.match(/.{2}/g) || [];

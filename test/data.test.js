@@ -66,6 +66,14 @@ test('трекер: без известного ника результат со
   assert.equal(ev.results.length, 0, 'открыли результат из таблицы, не играя');
 });
 
+test('трекер: pp = 0 от Tosu считается «не посчитано»', () => {
+  const s = normalizeTosuResult(resultFrame(MAP));
+  assert.equal(s.pp, null);
+  const f = resultFrame(MAP);
+  f.resultsScreen.pp = { current: 250.5, fc: 300 };
+  assert.equal(normalizeTosuResult(f).pp, 250.5);
+});
+
 test('трекер: Tosu присылает мусор — не падаем', () => {
   const t = new TosuTracker();
   t.process(null);
@@ -168,4 +176,26 @@ test('индексатор: сканирует Songs, повторный зап�
   assert.equal(searchBeatmaps(db, { q: 'played=no' }).total, 2);
   assert.doesNotThrow(() => searchBeatmaps(db, { q: 'a" OR (' }), 'спецсимволы FTS экранируются');
   db.close();
+});
+
+test('WebSocket-клиент: большие кадры и переподключение к недоступному серверу', async () => {
+  const { MiniWebSocket } = await import('../src/integrations/wsClient.js');
+  const { startWsServer } = await import('./wsServer.js');
+  const srv = await startWsServer();
+  const big = { pad: 'x'.repeat(200000), n: 1 };
+  const got = await new Promise((resolve, reject) => {
+    const ws = new MiniWebSocket(`ws://127.0.0.1:${srv.port}/websocket/v2`);
+    ws.onopen = () => { srv.send({ small: true }); srv.send(big); };
+    const msgs = [];
+    ws.onmessage = (m) => { msgs.push(JSON.parse(m.data)); if (msgs.length === 2) { ws.close(); resolve(msgs); } };
+    ws.onerror = (e) => reject(new Error(e.message));
+  });
+  assert.equal(got[0].small, true);
+  assert.equal(got[1].pad.length, 200000);
+  await srv.close();
+  const err = await new Promise((resolve) => {
+    const ws = new MiniWebSocket(`ws://127.0.0.1:${srv.port}/websocket/v2`);
+    ws.onerror = (e) => resolve(e.message);
+  });
+  assert.ok(err, 'отказ в соединении приходит как ошибка');
 });

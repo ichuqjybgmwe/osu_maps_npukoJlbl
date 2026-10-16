@@ -77,7 +77,7 @@ export async function ppView(el, { query }) {
       <tr><th></th><th>Моды</th><th>Точность %</th><th>Промахи</th><th>Комбо</th><th>100</th><th>50</th><th></th></tr>
       ${scenarios.map((s, i) => html`<tr data-i="${i}">
         <td><b>${s.name}</b></td>
-        <td><input data-k="mods" value="${s.mods}" placeholder="HDDT" style="width:90px"></td>
+        <td><input data-k="mods" value="${s.mods}" placeholder="NM" style="width:90px"></td>
         <td><input data-k="accuracy" type="number" step="0.01" min="0" max="100" value="${s.accuracy}" style="width:90px"></td>
         <td><input data-k="misses" type="number" min="0" value="${s.misses}" style="width:70px"></td>
         <td><input data-k="combo" type="number" min="0" value="${s.combo}" placeholder="макс" style="width:80px"></td>

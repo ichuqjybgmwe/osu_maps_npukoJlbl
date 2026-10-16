@@ -39,8 +39,9 @@ export function normalizeTosuResult(frame) {
     rate: r.mods?.rate || modsRate(modsArr),
     rank: r.rank || null,
     passed: r.rank ? r.rank !== 'F' : true,
-    pp: r.pp?.current ?? null,
-    ppFc: r.pp?.fc ?? null,
+    // Tosu часто отдаёт 0, если не успел посчитать pp — это «нет данных», а не 0pp.
+    pp: r.pp?.current > 0 ? r.pp.current : null,
+    ppFc: r.pp?.fc > 0 ? r.pp.fc : null,
     lazer: frame.client === 'lazer',
     playedAt: parseTosuDate(r.createdAt),
     raw: { resultsScreen: r, beatmap: { checksum: b.checksum, id: b.id, set: b.set }, client: frame.client },

@@ -118,6 +118,7 @@ tr.click:hover td { background: var(--panel-2); }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; font-size: 12px; user-select: none; }
 .chip.on { border-color: var(--accent); color: var(--accent); }
+.bg-banner[hidden] { display: none; }
 .bg-banner { height: 140px; border-radius: var(--radius); background: var(--panel-2) center/cover no-repeat; margin-bottom: 16px; position: relative; }
 .bg-banner::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius); background: linear-gradient(transparent, rgba(15,16,19,.9)); }
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; }

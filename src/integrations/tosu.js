@@ -3,6 +3,7 @@
 // сохранённые данные доступны, попытки подключения продолжаются в фоне.
 import { EventEmitter } from 'node:events';
 import { log } from '../logger.js';
+import { MiniWebSocket } from './wsClient.js';
 
 const L = log('tosu');
 
@@ -49,14 +50,10 @@ export class TosuClient extends EventEmitter {
 
   connect() {
     if (this.stopped) return;
-    if (typeof WebSocket !== 'function') {
-      this.setStatus({ state: 'error', lastError: 'В этой версии Node нет WebSocket (нужен Node 22+)' });
-      return;
-    }
     this.setStatus({ state: 'connecting' });
     let ws;
     try {
-      ws = new WebSocket(this.url);
+      ws = new MiniWebSocket(this.url);
     } catch (e) {
       this.setStatus({ state: 'error', lastError: e.message });
       this.scheduleReconnect();
@@ -65,8 +62,7 @@ export class TosuClient extends EventEmitter {
     this.ws = ws;
     let opened = false;
     let finished = false;
-    // В Node 22 при отказе в соединении WebSocket шлёт только error (без close),
-    // поэтому завершение обрабатываем в одном месте для обоих событий + таймаут.
+    // Завершение (ошибка, закрытие, таймаут) обрабатываем в одном месте.
     const finish = (reason) => {
       if (finished) return;
       finished = true;

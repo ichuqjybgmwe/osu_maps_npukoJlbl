@@ -156,4 +156,8 @@ export const migrations = [
     UNIQUE (beatmap_md5, beatmap_id, mods)
   );
   `,
+  // 2: pp = 0 из Tosu означает «не посчитано» — иначе такие scores выпадают из топа.
+  `
+  UPDATE scores SET pp = NULL WHERE pp = 0 AND sources = 'tosu';
+  `,
 ];
