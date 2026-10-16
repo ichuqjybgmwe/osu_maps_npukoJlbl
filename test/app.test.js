@@ -104,6 +104,12 @@ test('3. Tosu: игра → результат в SQLite; повторный п�
     env.tosu.send(f);
     await new Promise((r) => setTimeout(r, 20));
   }
+  // Оверлей «сейчас в игре»: pp по точности для выбранной карты с модами HDDT
+  const np = await waitFor(async () => { const d = (await http('/api/now')).data.nowPp; return d && d.md5 === m.md5 ? d : null; });
+  assert.equal(np.mods, 'HDDT');
+  assert.equal(np.table.length, 6);
+  assert.ok(np.table[5].pp > np.table[0].pp, 'SS даёт больше, чем 95%');
+  assert.ok(np.targets.some((t) => t.id === 'gain1'), 'есть цель «+1pp к профилю»');
   const saved = await waitFor(async () => (await http(`/api/scores?md5=${m.md5}`)).data.find((s) => s.score === 1111));
   assert.equal((await http(`/api/scores?md5=${m.md5}`)).data.filter((s) => s.score === 1111).length, 1, 'ровно одна запись');
   assert.equal(saved.sources, 'tosu');

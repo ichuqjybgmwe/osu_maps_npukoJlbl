@@ -17,6 +17,8 @@ import { ProfileService, cacheApiBeatmap } from './profile/profileService.js';
 import { OsuFileSource } from './pp/osuSource.js';
 import { PpService } from './pp/ppService.js';
 import { FarmService } from './farm/farm.js';
+import { NowService } from './now/nowService.js';
+import { TosuLauncher, findTosu } from './integrations/tosuLauncher.js';
 import { searchBeatmaps, effectiveAttrs } from './explorer/search.js';
 import { CALCULATOR_INFO } from './pp/calculator.js';
 import { VERSION } from './version.js';
@@ -46,6 +48,8 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
   const profile = new ProfileService({ db, api, scores, getSettings, events });
   const indexer = new SongsIndexer({ db, events, getSettings });
   const farm = new FarmService({ db, profile, ppService, api, getSettings, getSongsDir, events });
+  const nowService = new NowService({ db, ppService, profile, getSettings, events });
+  const launcher = new TosuLauncher({ getSettings });
 
   // --- Tosu ---
   const tosu = new TosuClient({ url: settings.get().tosuUrl });
@@ -58,6 +62,7 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
   tosu.on('status', (st) => events.emit('tosu', st));
   tosu.on('frame', (frame) => {
     tracker.process(frame);
+    nowService.onFrame(frame);
     now = summarizeFrame(frame);
     if (Date.now() - lastNowEmit > 500) {
       lastNowEmit = Date.now();
@@ -76,6 +81,7 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
   });
   tosu.on('disconnect', () => {
     now = null;
+    nowService.invalidate();
     events.emit('now', null);
   });
   tracker.on('attempt', (a) => {
@@ -91,6 +97,7 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
       const r = await scores.saveAndEnrich(s);
       if (r.inserted) {
         scores.linkLastPassAttempt(s.beatmapMd5, r.id);
+        nowService.invalidate(); // лучший скор на карте и топ изменились
         const row = db.get('SELECT * FROM scores WHERE id = ?', r.id);
         const pp = row.pp ?? row.pp_calc;
         const gain = pp != null && row.passed ? profile.projectGain(row.beatmap_md5, pp) : null;
@@ -129,6 +136,8 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
       counts: db.get('SELECT (SELECT COUNT(*) FROM scores) AS scores, (SELECT COUNT(*) FROM attempts) AS attempts, (SELECT COUNT(*) FROM beatmaps WHERE missing = 0) AS beatmaps'),
       calculator: CALCULATOR_INFO,
       now,
+      nowPp: now ? nowService.current : null,
+      tosuLauncher: launcher.status(),
     };
   });
 
@@ -170,7 +179,13 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
     return indexer.status();
   });
 
-  router.get('/api/now', () => ({ tosu: tosu.status, now }));
+  router.get('/api/now', () => ({ tosu: tosu.status, now, nowPp: now ? nowService.current : null }));
+  router.post('/api/tosu/find', () => {
+    const found = findTosu({ gameDir: settings.get().gameDir });
+    if (found) settings.update({ tosuPath: found });
+    return { found: !!found, path: found };
+  });
+  router.post('/api/tosu/launch', async () => launcher.start());
 
   router.get('/api/scores', ({ query }) => scores.list({
     md5: query.md5, beatmapId: query.beatmapId ? Number(query.beatmapId) : undefined,
@@ -351,7 +366,7 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
   }
 
   const app = {
-    db, dirs, settings, events, api, tosu, tracker, scores, profile, indexer, farm, ppService, server,
+    db, dirs, settings, events, api, tosu, tracker, nowService, launcher, scores, profile, indexer, farm, ppService, server,
     profileTimer: null,
     get port() { return actualPort; },
     async listen(p = port ?? settings.get().port, host = '127.0.0.1') {
@@ -368,7 +383,17 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
     startBackground({ tosuEnabled = settings.get().tosuEnabled } = {}) {
       try { dailyBackup(db, dirs.backups); } catch (e) { L.warn(`Резервная копия не создана: ${e.message}`); }
       if (tosuEnabled) tosu.start();
-      const s = settings.get();
+      let s = settings.get();
+      // tosu без окна: находим tosu.exe (если путь не задан) и запускаем вместе с MapVault.
+      if (s.tosuAutostart && !s.tosuPath && process.platform === 'win32') {
+        const found = findTosu({ gameDir: s.gameDir });
+        if (found) {
+          settings.update({ tosuPath: found });
+          L.info(`Найден tosu: ${found}`);
+        }
+        s = settings.get();
+      }
+      if (tosuEnabled && s.tosuAutostart && s.tosuPath) launcher.start().catch((e) => L.warn(`tosu: ${e.message}`));
       if (s.autoScanOnStart && s.songsDir && fs.existsSync(s.songsDir)) {
         indexer.scan().catch((e) => L.warn(`Сканирование при запуске: ${e.message}`));
       } else if (!s.songsDir) {
@@ -390,6 +415,7 @@ export function createApp({ dataDir, staticDir, assets, fetchImpl, tosuUrl, port
       clearInterval(app.profileTimer);
       clearTimeout(profileRefreshTimer);
       tosu.stop();
+      launcher.stop();
       indexer.cancel();
       await new Promise((r) => server.close(() => r()));
       server.closeAllConnections?.();

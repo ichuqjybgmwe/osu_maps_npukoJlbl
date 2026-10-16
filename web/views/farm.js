@@ -1,4 +1,4 @@
-import { api, html, fmt, toast } from '../lib.js';
+import { api, html, fmt, toast, mapImg, starsBadge, modsBadges } from '../lib.js';
 
 const COMBOS = ['NM', 'HD', 'HR', 'DT', 'HDHR', 'HDDT'];
 
@@ -89,17 +89,17 @@ function profileCard(p) {
 
 function item(o) {
   const link = o.md5 && o.kind === 'local' ? `/map/${o.md5}?mods=${o.mods === 'NM' ? '' : o.mods}` : `/map/id/${o.beatmap_id}`;
-  return html`<div class="card mb farm-item">
-    <div class="farm-score">${o.farmScore}<small>Farm Score</small></div>
+  return html`<div class="farm-card">${mapImg({ md5: o.md5, local: o.kind === 'local', setId: o.beatmapset_id }, 'tile')}<div class="farm-item">
+    <div class="farm-score" title="Farm Score: насколько выгодна карта (100 — лучшая в подборке)">${o.farmScore}</div>
     <div>
-      <div><a href="${link}"><b>${o.title}</b></a> <span class="pill accent">${o.mods}</span> ${o.status ? html`<span class="pill">${o.status}</span>` : ''} ${o.kind === 'online' ? html`<span class="pill warn">нет в Songs</span>` : ''}</div>
-      <div class="small muted">${fmt.num(o.stars, 2)}★${o.approxStars ? '≈' : ''} · AR ${fmt.num(o.ar, 1)} · OD ${fmt.num(o.od, 1)} · ${fmt.num(o.bpm)} BPM · ${fmt.len(o.length)} · map by ${o.creator}</div>
+      <div><a href="${link}"><b>${o.title}</b></a> ${modsBadges(o.mods === 'NM' ? '' : o.mods)} ${o.status ? html`<span class="pill">${o.status}</span>` : ''} ${o.kind === 'online' ? html`<span class="pill warn">нет в Songs</span>` : ''}</div>
+      <div class="small muted" style="margin-top:4px">${starsBadge(o.stars, o.approxStars)} AR ${fmt.num(o.ar, 1)} · OD ${fmt.num(o.od, 1)} · ${fmt.num(o.bpm)} BPM · ${fmt.len(o.length)} · map by ${o.creator}</div>
       <ul class="reasons">${o.reasons.map((r) => html`<li>${r}</li>`)}</ul>
       ${o.alternatives?.length ? html`<div class="small muted">Также: ${o.alternatives.map((a) => `${a.mods} ${Math.round(a.predictedPp)}pp (+${a.gain.toFixed(1)})`).join(' · ')}</div>` : ''}
       ${o.links ? html`<div class="row small mt"><a href="${o.links.page}" target="_blank" rel="noopener">osu.ppy.sh</a><a href="${o.links.download}" target="_blank" rel="noopener">Скачать</a><a href="${o.links.direct}">osu!direct</a><a href="${o.links.mirror}" target="_blank" rel="noopener">Зеркало</a></div>` : ''}
     </div>
     <div class="num"><div style="font-size:18px;font-weight:600;color:var(--good)">+${o.gain.toFixed(1)}pp</div><div class="small muted">${fmt.pp0(o.predictedPp)} при ${fmt.acc(o.predictedAcc)}</div>${o.existingPp ? html`<div class="small muted">сейчас ${fmt.pp0(o.existingPp)}</div>` : ''}<div class="small muted">шанс ${Math.round(o.probability * 100)}%</div></div>
-  </div>`;
+  </div></div>`;
 }
 
 function feedbackCard(fb) {

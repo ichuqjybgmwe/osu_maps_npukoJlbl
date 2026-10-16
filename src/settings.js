@@ -6,6 +6,8 @@ export const DEFAULT_SETTINGS = {
   songsDir: null,
   tosuUrl: 'ws://127.0.0.1:24050/websocket/v2',
   tosuEnabled: true,
+  tosuPath: '',         // путь к tosu.exe — MapVault запустит его сам, без окна
+  tosuAutostart: true,
   mode: 0,              // 0 osu!, 1 taiko, 2 catch, 3 mania
   ppMode: 'stable',     // stable | lazer — какие правила pp использовать в калькуляторе
   username: '',         // ник для публичного профиля (если вход через osu! не выполнен)

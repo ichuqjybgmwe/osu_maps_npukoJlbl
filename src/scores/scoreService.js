@@ -176,7 +176,8 @@ export class ScoreService {
   attempts({ md5, limit = 100 } = {}) {
     if (md5) return this.db.all('SELECT * FROM attempts WHERE beatmap_md5 = ? ORDER BY id DESC LIMIT ?', md5, limit);
     return this.db.all(
-      `SELECT a.*, COALESCE(b.artist || ' - ' || b.title || ' [' || b.version || ']', ab.artist || ' - ' || ab.title || ' [' || ab.version || ']') AS title
+      `SELECT a.*, COALESCE(b.artist || ' - ' || b.title || ' [' || b.version || ']', ab.artist || ' - ' || ab.title || ' [' || ab.version || ']') AS title,
+              COALESCE(b.beatmapset_id, ab.beatmapset_id) AS beatmapset_id, b.md5 AS local_md5
        FROM attempts a LEFT JOIN beatmaps b ON b.md5 = a.beatmap_md5 LEFT JOIN api_beatmaps ab ON ab.beatmap_id = a.beatmap_id
        ORDER BY a.id DESC LIMIT ?`, limit,
     );

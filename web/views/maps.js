@@ -1,4 +1,4 @@
-import { api, html, raw, fmt, debounce, bindRowLinks, rankBadge } from '../lib.js';
+import { api, html, raw, fmt, debounce, bindRowLinks, rankBadge, mapImg, starsBadge } from '../lib.js';
 
 const MOD_CHIPS = ['HD', 'HR', 'DT', 'EZ', 'HT', 'FL'];
 const SORTS = [
@@ -54,7 +54,7 @@ export async function mapsView(el, { query }, ctx) {
           <select id="mode"><option value="">Все режимы</option><option value="0">osu!</option><option value="1">taiko</option><option value="2">catch</option><option value="3">mania</option></select>
           <select id="sort">${SORTS.map(([k, t]) => html`<option value="${k}">${t}</option>`)}</select>
           <select id="order"><option value="">По умолчанию</option><option value="desc">По убыванию</option><option value="asc">По возрастанию</option></select>
-          <span class="spacer"></span><span class="muted small" id="count"></span>
+          <span class="spacer"></span><span class="muted small" id="count"></span><div class="chips"><span class="chip" data-view="tiles">▦ Плитки</span><span class="chip" data-view="list">☰ Список</span></div>
         </div>
         <details class="small muted mt"><summary>Синтаксис фильтров</summary>
           <div class="mt">Ключи: <span class="mono">stars sr ar od cs hp bpm length combo objects pp pp95 pp100 mode status played attempts creator artist title diff acc mypp rank id set</span>.
@@ -76,19 +76,27 @@ export async function mapsView(el, { query }, ctx) {
       try {
         const r = await api(`/api/beatmaps/search?${p}`);
         body.querySelector('#count').textContent = `Найдено: ${fmt.num(r.total)}`;
-        box.innerHTML = r.items.length ? html`<table>
-          <tr><th>Карта</th><th class="num">★</th><th class="num">pp 98%</th><th class="num">AR</th><th class="num">OD</th><th class="num">CS</th><th class="num">BPM</th><th class="num">Длина</th><th class="num">Мой лучший</th><th class="num">Попытки</th><th>Статус</th></tr>
-          ${r.items.map((m) => html`<tr class="click" data-href="/map/${m.md5}${state.mods ? '?mods=' + state.mods : ''}">
-            <td class="title">${m.artist} — ${m.title} <span class="muted">[${m.version}]</span><div class="small muted">${m.creator}${m.mode ? ` · ${['osu!', 'taiko', 'catch', 'mania'][m.mode]}` : ''}</div></td>
-            <td class="num">${fmt.num(m.eff.stars, 2)}${m.eff.approxStars ? raw('<span class="muted" title="Приближение: для этой комбинации модов точных звёзд в индексе нет">≈</span>') : ''}</td>
-            <td class="num">${fmt.pp0(m.pp_nm_98)}</td>
-            <td class="num">${fmt.num(m.eff.ar, 1)}</td><td class="num">${fmt.num(m.eff.od, 1)}</td><td class="num">${fmt.num(m.eff.cs, 1)}</td>
-            <td class="num">${fmt.num(m.eff.bpm)}</td><td class="num">${fmt.len(m.eff.length)}</td>
-            <td class="num">${m.my ? html`${rankBadge(m.my.best_rank)} ${fmt.pp0(m.my.best_pp)} <span class="muted small">${fmt.acc(m.my.best_acc)}</span>` : html`<span class="muted">—</span>`}</td>
-            <td class="num">${m.attempts || ''}</td>
-            <td>${m.status ? html`<span class="pill ${['ranked', 'approved'].includes(m.status) ? 'good' : m.status === 'loved' ? 'accent' : ''}">${m.status}</span>` : ''}</td>
-          </tr>`)}
-        </table>` : html`<div class="empty">${r.total === 0 && !state.q ? 'Индекс пуст. Укажите папку Songs в настройках и запустите сканирование.' : 'Ничего не найдено.'}</div>`;
+        const href = (m) => `/map/${m.md5}${state.mods ? '?mods=' + state.mods : ''}`;
+        const statusPill = (m) => (m.status ? html`<span class="pill ${['ranked', 'approved'].includes(m.status) ? 'good' : m.status === 'loved' ? 'accent' : ''}">${m.status}</span>` : '');
+        const view = localStorage.getItem('mv.mapsView') || 'tiles';
+        box.innerHTML = !r.items.length
+          ? html`<div class="empty">${r.total === 0 && !state.q ? 'Индекс пуст. Укажите папку Songs в настройках и запустите сканирование.' : 'Ничего не найдено.'}</div>`
+          : view === 'tiles'
+            ? html`<div class="tiles">${r.items.map((m) => html`<div class="tile" data-href="${href(m)}">
+                ${mapImg({ md5: m.md5, local: true, setId: m.beatmapset_id }, 'tile')}
+                <div class="tile-top"><span>${starsBadge(m.eff.stars, m.eff.approxStars)}</span><span>${m.my ? html`${rankBadge(m.my.best_rank)}` : ''} ${statusPill(m)}</span></div>
+                <div class="tile-body">
+                  <div class="tile-title">${m.title}</div>
+                  <div class="small" style="color:#d5d8e4">${m.artist} · <b>${m.version}</b></div>
+                  <div class="tile-stats"><span>AR ${fmt.num(m.eff.ar, 1)}</span><span>OD ${fmt.num(m.eff.od, 1)}</span><span>CS ${fmt.num(m.eff.cs, 1)}</span><span>${fmt.num(m.eff.bpm)} BPM</span><span>${fmt.len(m.eff.length)}</span></div>
+                  <div class="row between" style="margin-top:8px"><span class="small muted">${m.creator}</span><span><b class="grad-text">${fmt.pp0(m.pp_nm_98)}</b> <span class="small muted">98% NM</span>${m.my ? html` · <span class="small">мой ${fmt.pp0(m.my.best_pp)}</span>` : ''}</span></div>
+                </div></div>`)}</div>`
+            : html`<div class="list">${r.items.map((m) => html`<div class="item" data-href="${href(m)}">
+                <div class="img-box">${mapImg({ md5: m.md5, local: true, setId: m.beatmapset_id }, 'thumb')}</div>
+                <div style="min-width:0"><div class="item-title">${m.artist} — ${m.title}</div><div class="item-sub">${m.version} · ${m.creator}</div>
+                  <div class="item-meta">${starsBadge(m.eff.stars, m.eff.approxStars)}<span class="small muted">AR ${fmt.num(m.eff.ar, 1)} · OD ${fmt.num(m.eff.od, 1)} · CS ${fmt.num(m.eff.cs, 1)} · ${fmt.num(m.eff.bpm)} BPM · ${fmt.len(m.eff.length)}${m.attempts ? ` · попыток ${m.attempts}` : ''}</span>${statusPill(m)}</div></div>
+                <div class="item-right">${m.my ? html`${rankBadge(m.my.best_rank)} <span class="small muted">${fmt.acc(m.my.best_acc)}</span>` : ''}<div class="big">${fmt.pp0(m.pp_nm_98)}</div><div class="small muted">98% NM${m.my ? ` · мой ${fmt.pp0(m.my.best_pp)}` : ''}</div></div>
+              </div>`)}</div>`;
         bindRowLinks(box, ctx.navigate);
         const pager = body.querySelector('#pager');
         const pages = Math.ceil(r.total / PAGE);
@@ -119,6 +127,9 @@ export async function mapsView(el, { query }, ctx) {
       state.offset = 0;
       run();
     }));
+    const paintView = () => body.querySelectorAll('[data-view]').forEach((c) => c.classList.toggle('on', c.dataset.view === (localStorage.getItem('mv.mapsView') || 'tiles')));
+    paintView();
+    body.querySelectorAll('[data-view]').forEach((c) => c.addEventListener('click', () => { localStorage.setItem('mv.mapsView', c.dataset.view); paintView(); run(); }));
     for (const id of ['mode', 'sort', 'order']) body.querySelector(`#${id}`).addEventListener('change', (e) => { state[id] = e.target.value; state.offset = 0; run(); });
     run();
   }
@@ -149,11 +160,11 @@ export async function mapsView(el, { query }, ctx) {
       try {
         const r = await api(`/api/catalog/search?${p}`);
         cursor = r.cursor;
-        const items = r.sets.map((s) => html`<div class="card mb">
-          <div class="row between"><div><b>${s.artist} — ${s.title}</b> <span class="muted">by ${s.creator}</span> <span class="pill">${s.status}</span> ${s.local ? html`<span class="pill good">есть в Songs</span>` : ''}</div>
+        const items = r.sets.map((s) => html`<div class="farm-card"><img src="https://assets.ppy.sh/beatmaps/${s.id}/covers/cover@2x.jpg" data-fb="" loading="lazy" alt=""><div style="padding:16px">
+          <div class="row between"><div><div class="tile-title" style="font-size:18px">${s.title}</div><div class="small" style="color:#d5d8e4">${s.artist} · by ${s.creator}</div><div class="row" style="margin-top:6px"><span class="pill">${s.status}</span> ${s.local ? html`<span class="pill good">есть в Songs</span>` : ''}</div></div>
           <div class="row small"><a href="${s.links.page}" target="_blank" rel="noopener">osu.ppy.sh</a><a href="${s.links.download}" target="_blank" rel="noopener">Скачать</a><a href="${s.links.direct}">osu!direct</a><a href="${s.links.mirror}" target="_blank" rel="noopener">Зеркало</a></div></div>
-          <div class="table-wrap mt"><table>${s.beatmaps.map((b) => html`<tr class="click" data-href="/map/id/${b.id}"><td class="title">${b.version}</td><td class="num">${fmt.stars(b.stars)}</td><td class="num">AR ${b.ar}</td><td class="num">OD ${b.od}</td><td class="num">CS ${b.cs}</td><td class="num">${fmt.num(b.bpm)} BPM</td><td class="num">${fmt.len(b.length)}</td><td><a href="/pp?beatmapId=${b.id}">pp →</a></td></tr>`)}</table></div>
-        </div>`);
+          <div class="table-wrap mt"><table>${s.beatmaps.map((b) => html`<tr class="click" data-href="/map/id/${b.id}"><td class="title">${b.version}</td><td>${starsBadge(b.stars)}</td><td class="num">AR ${b.ar}</td><td class="num">OD ${b.od}</td><td class="num">CS ${b.cs}</td><td class="num">${fmt.num(b.bpm)} BPM</td><td class="num">${fmt.len(b.length)}</td><td><a href="/pp?beatmapId=${b.id}">pp →</a></td></tr>`)}</table></div>
+        </div></div>`);
         if (more) box.insertAdjacentHTML('beforeend', html`${items}`.toString());
         else box.innerHTML = r.sets.length ? html`${items}` : html`<div class="empty">Ничего не найдено.</div>`;
         box.querySelector('#more')?.remove();

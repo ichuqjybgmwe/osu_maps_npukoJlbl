@@ -9,6 +9,7 @@ import { parseQuery, effectiveAttrs } from '../src/explorer/search.js';
 import { parseBeatmap, calcPerformance, calcDifficulty, summarizeForIndex } from '../src/pp/calculator.js';
 import { fitAccuracyModel } from '../src/farm/farm.js';
 import { resolveDataDir } from '../src/paths.js';
+import { minAccuracy } from '../src/now/nowService.js';
 import { makeOsu } from './helpers.js';
 
 test('моды: разные форматы приводятся к одному виду', () => {
@@ -140,4 +141,16 @@ test('Farm: модель точности падает со звёздами', (
 test('папка данных: переменная окружения и платформы', () => {
   assert.equal(resolveDataDir({ MAPVAULT_DATA: '/x/y' }, 'linux'), path.resolve('/x/y'));
   assert.match(resolveDataDir({ APPDATA: 'C:\\Users\\a\\AppData\\Roaming' }, 'win32'), /MapVault$/);
+});
+
+test('оверлей: минимальная точность для цели', () => {
+  const map = parseBeatmap(makeOsu({ objects: 400, bpm: 200, spacing: 150 }));
+  const ppAt = (acc) => calcPerformance(map, { accuracy: acc }).pp;
+  const target = ppAt(97.5);
+  const r = minAccuracy(ppAt, target);
+  assert.equal(r.reachable, true);
+  assert.ok(Math.abs(r.accuracy - 97.5) < 0.02, `нашли ${r.accuracy}`);
+  assert.ok(ppAt(r.accuracy) >= target);
+  assert.equal(minAccuracy(ppAt, ppAt(100) + 1).reachable, false, 'выше SS — недостижимо');
+  map.free();
 });

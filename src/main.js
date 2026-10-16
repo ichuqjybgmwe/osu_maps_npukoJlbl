@@ -78,7 +78,7 @@ async function main() {
   const url = `http://localhost:${port}/`;
   L.info(`Готово: ${url}`);
   try {
-    console.log(`\n  MapVault работает: ${url}\n  Закройте это окно (или нажмите Ctrl+C), чтобы выйти.\n`);
+    console.log(`\n  MapVault работает: ${url}\n  Выйти: кнопка «Выйти» в MapVault (или Ctrl+C здесь).\n`);
   } catch {
     // нет консоли
   }

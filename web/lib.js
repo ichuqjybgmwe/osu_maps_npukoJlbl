@@ -71,32 +71,113 @@ export function debounce(fn, ms) {
 
 export const MODES = ['osu!', 'taiko', 'catch', 'mania'];
 
-export function scoreRow(s, { showTitle = true } = {}) {
-  const pp = s.pp ?? s.pp_calc;
-  const link = s.beatmap_md5 ? `/map/${s.beatmap_md5}` : s.beatmap_id ? `/map/id/${s.beatmap_id}` : null;
-  return html`<tr class="${link ? 'click' : ''}" ${raw(link ? `data-href="${esc(link)}"` : '')}>
-    ${showTitle ? html`<td class="title">${s.title || s.beatmap_title || `#${s.beatmap_id || s.beatmap_md5}`}</td>` : ''}
-    <td>${rankBadge(s.passed ? s.rank : 'F')}</td>
-    <td class="num">${fmt.pp(pp)}${s.pp == null && s.pp_calc != null ? html` <span class="muted small" title="Рассчитано rosu-pp">≈</span>` : ''}</td>
-    <td class="num">${fmt.acc(s.accuracy)}</td>
-    <td>${fmt.mods(s.mods)}</td>
-    <td class="num">${fmt.num(s.max_combo)}x${s.map_max_combo ? html`<span class="muted">/${s.map_max_combo}</span>` : ''}</td>
-    <td class="num">${s.nmiss ? html`<span style="color:var(--bad)">${s.nmiss}✕</span>` : html`<span class="muted">0✕</span>`}</td>
-    <td class="muted small">${fmt.ago(s.played_at)}</td>
-    <td>${(s.sources || '').split(',').map((x) => html`<span class="pill">${x}</span> `)}</td>
-  </tr>`;
+// ---------- картинки карт ----------
+// Источники: фон из вашей папки Songs (точный, работает без интернета) и обложки
+// с сервера osu! (лёгкие, нужны ID мапсета и интернет). Если картинка не загрузилась,
+// пробуем следующую из data-fb, а если кончились — прячем, остаётся градиент.
+const COVER = (setId, kind) => `https://assets.ppy.sh/beatmaps/${setId}/covers/${kind}.jpg`;
+
+export function imgSources({ md5, local = true, setId }, kind = 'card') {
+  const localUrl = md5 && local ? `/api/beatmaps/${md5}/background` : null;
+  const cdn = setId ? COVER(setId, kind === 'hero' ? 'cover@2x' : kind === 'thumb' ? 'list@2x' : 'card@2x') : null;
+  // Для крупных картинок — сначала свой фон (полное разрешение), для мелких — лёгкая обложка.
+  const order = kind === 'hero' || kind === 'tile' ? [localUrl, cdn, setId && COVER(setId, 'card@2x')] : [cdn, localUrl];
+  return [...new Set(order.filter(Boolean))];
 }
 
-export const scoreHead = (showTitle = true) => html`<tr>${showTitle ? html`<th>Карта</th>` : ''}<th>Ранг</th><th class="num">pp</th><th class="num">Точность</th><th>Моды</th><th class="num">Комбо</th><th class="num">Промахи</th><th>Когда</th><th>Источник</th></tr>`;
+export function mapImg(opts, kind = 'card', cls = '') {
+  const [first, ...rest] = imgSources(opts, kind);
+  if (!first) return raw(`<img class="${cls} img-missing" alt="">`);
+  return raw(`<img class="${cls}" src="${esc(first)}" data-fb="${esc(rest.join('|'))}" loading="lazy" decoding="async" alt="">`);
+}
 
-/** Делегирование кликов по строкам с data-href. */
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset) return;
+  const list = (img.dataset.fb || '').split('|').filter(Boolean);
+  if (list.length) {
+    img.dataset.fb = list.slice(1).join('|');
+    img.src = list[0];
+  } else {
+    img.classList.add('img-missing');
+  }
+}, true);
+
+// Цвет звёзд как в osu!: от голубого через зелёный и жёлтый к красному и фиолетовому.
+const STAR_STOPS = [[0.1, '#4290fb'], [1.25, '#4fc0ff'], [2, '#4fffd5'], [2.5, '#7cff4f'], [3.3, '#f6f05c'], [4.2, '#ff8068'], [4.9, '#ff4e6f'], [5.8, '#c645b8'], [6.7, '#6563de'], [7.7, '#18158e'], [9, '#000000']];
+function hex(h) { return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); }
+export function starColor(v) {
+  if (v == null) return '#555';
+  if (v <= STAR_STOPS[0][0]) return STAR_STOPS[0][1];
+  for (let i = 1; i < STAR_STOPS.length; i++) {
+    const [b, cb] = STAR_STOPS[i];
+    const [a, ca] = STAR_STOPS[i - 1];
+    if (v <= b) {
+      const t = (v - a) / (b - a);
+      const x = hex(ca);
+      const y = hex(cb);
+      return `rgb(${x.map((c, k) => Math.round(c + (y[k] - c) * t)).join(',')})`;
+    }
+  }
+  return '#000';
+}
+export const starsBadge = (v, approx = false) => (v == null ? '' : raw(`<span class="stars" style="background:${starColor(v)};color:${v >= 6.5 ? '#ffd966' : '#111'}">★ ${Number(v).toFixed(2)}${approx ? '≈' : ''}</span>`));
+export const modsBadges = (m) => {
+  const list = (m || '').match(/.{2}/g) || ['NM'];
+  return raw(list.map((x) => `<span class="mod mod-${esc(x)}">${esc(x)}</span>`).join(''));
+};
+
+/** Элемент списка результата: обложка, карта, ранг, pp. */
+export function scoreItem(s, { showTitle = true } = {}) {
+  const pp = s.pp ?? s.pp_calc;
+  const md5 = s.local_md5 || s.beatmap_md5;
+  const link = s.beatmap_md5 ? `/map/${s.beatmap_md5}` : s.beatmap_id ? `/map/id/${s.beatmap_id}` : '';
+  const title = s.title || s.beatmap_title || `#${s.beatmap_id || s.beatmap_md5}`;
+  const [song, diff] = splitTitle(title);
+  return html`<div class="item" data-href="${link}">
+    <div class="img-box">${mapImg({ md5, local: !!s.local_md5, setId: s.beatmapset_id }, 'thumb')}</div>
+    <div style="min-width:0">
+      ${showTitle ? html`<div class="item-title">${song}</div><div class="item-sub">${diff}</div>` : html`<div class="item-title">${fmt.acc(s.accuracy)} · ${fmt.num(s.max_combo)}x${s.map_max_combo ? `/${s.map_max_combo}` : ''}</div>`}
+      <div class="item-meta">${modsBadges(s.mods)}
+        <span class="small muted">${showTitle ? `${fmt.acc(s.accuracy)} · ${fmt.num(s.max_combo)}x` : ''}${s.nmiss ? ` · ${s.nmiss}✕` : ''} · ${fmt.ago(s.played_at)}</span>
+        ${(s.sources || '').split(',').filter(Boolean).map((x) => html`<span class="pill">${x}</span>`)}</div>
+    </div>
+    <div class="item-right">${rankBadge(s.passed ? s.rank : 'F')}<div class="big">${fmt.pp(pp)}${s.pp == null && pp != null ? html`<span class="muted small" title="Рассчитано rosu-pp"> ≈</span>` : ''}</div></div>
+  </div>`;
+}
+
+export function splitTitle(t) {
+  const m = /^(.*)\s\[(.*)\]$/.exec(t || '');
+  return m ? [m[1], m[2]] : [t || '', ''];
+}
+
+// Совместимость: табличная строка результата (используется на старых экранах).
+export const scoreRow = (s, o) => scoreItem(s, o);
+export const scoreHead = () => '';
+
+/** Клики по любым элементам с data-href (строки, плитки, карточки). */
 export function bindRowLinks(root, navigate) {
-  root.querySelectorAll('tr[data-href]').forEach((tr) => {
-    tr.addEventListener('click', (e) => {
-      if (e.target.closest('a,button,input')) return;
-      navigate(tr.dataset.href);
+  root.querySelectorAll('[data-href]').forEach((el) => {
+    if (!el.dataset.href) return;
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('a,button,input,select')) return;
+      navigate(el.dataset.href);
     });
   });
+}
+
+/** Фон всего приложения — размытый bg текущей карты. */
+export function setAmbient(opts) {
+  const el = document.getElementById('ambient-img');
+  if (!el) return;
+  if (!opts) { el.classList.remove('on'); return; }
+  const srcs = imgSources(opts, 'hero');
+  if (!srcs.length) return;
+  const img = new Image();
+  let i = 0;
+  img.onload = () => { el.style.backgroundImage = `url("${img.src}")`; el.classList.add('on'); };
+  img.onerror = () => { if (++i < srcs.length) img.src = srcs[i]; };
+  img.src = srcs[0];
 }
 
 /** Простой линейный график на canvas. */
