@@ -1,0 +1,26 @@
+{
+  "name": "mapvault",
+  "version": "0.1.0",
+  "description": "MapVault — локальный компаньон для osu!: scores, профиль, поиск карт, PP-калькулятор и Farm.",
+  "type": "module",
+  "private": true,
+  "main": "src/main.js",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/main.js",
+    "dev": "node --disable-warning=ExperimentalWarning --watch src/main.js --no-browser",
+    "test": "node --disable-warning=ExperimentalWarning --test \"test/*.test.js\"",
+    "fake-tosu": "node scripts/fake-tosu.mjs",
+    "build": "node scripts/build.mjs",
+    "build:win": "node scripts/build.mjs --target=win-x64",
+    "build:linux": "node scripts/build.mjs --target=linux-x64"
+  },
+  "dependencies": {
+    "rosu-pp-js": "4.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "postject": "1.0.0-alpha.6"
+  },
+  "license": "MIT"
+}
