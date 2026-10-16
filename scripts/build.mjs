@@ -114,6 +114,23 @@ if (targetOs === 'darwin') postjectArgs.push('--macho-segment-name', 'NODE_SEA')
 execFileSync(process.execPath, [require.resolve('postject/dist/cli.js'), ...postjectArgs], { stdio: 'inherit' });
 if (target === hostTarget && process.platform === 'darwin') execFileSync('codesign', ['--sign', '-', exe]);
 
+// 5b. Windows: подсистема GUI вместо консоли — при запуске нет чёрного окна.
+// Поле Subsystem лежит в Optional Header (смещение 68), одинаково для PE32 и PE32+.
+if (targetOs === 'win' && !args.console) {
+  const fd = fs.openSync(exe, 'r+');
+  const head = Buffer.alloc(4096);
+  fs.readSync(fd, head, 0, head.length, 0);
+  const peOffset = head.readUInt32LE(0x3c);
+  if (head.toString('latin1', peOffset, peOffset + 4) !== 'PE\0\0') throw new Error('Не найден PE-заголовок');
+  const subsystemOffset = peOffset + 24 + 68;
+  const before = head.readUInt16LE(subsystemOffset);
+  const buf = Buffer.alloc(2);
+  buf.writeUInt16LE(2); // IMAGE_SUBSYSTEM_WINDOWS_GUI
+  fs.writeSync(fd, buf, 0, 2, subsystemOffset);
+  fs.closeSync(fd);
+  log(`подсистема Windows: ${before} → 2 (без окна консоли)`);
+}
+
 // 6. Документация рядом с exe
 fs.copyFileSync(path.join(root, 'docs', 'INSTALL.md'), path.join(outDir, 'ИНСТРУКЦИЯ.md'));
 fs.copyFileSync(path.join(root, 'LICENSE'), path.join(outDir, 'LICENSE.txt'));

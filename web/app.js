@@ -1,5 +1,5 @@
 // Маршрутизация и живые обновления (SSE).
-import { api, toast, fmt } from './lib.js';
+import { api, toast, fmt, setAmbient } from './lib.js';
 import { dashboardView } from './views/dashboard.js';
 import { profileView } from './views/profile.js';
 import { mapsView } from './views/maps.js';
@@ -119,17 +119,28 @@ function connectEvents() {
       const gain = data.gain?.gain;
       toast(`Сохранён результат: ${data.title || ''} ${data.mods || 'NM'} ${data.accuracy?.toFixed(2)}% — ${fmt.pp(data.pp)}${gain != null ? (gain > 0.05 ? `, ≈ +${gain.toFixed(1)}pp к профилю` : ', в профиль не идёт') : ''}`);
     }
+    if (type === 'nowpp' && data) setAmbient({ md5: data.md5, local: data.local, setId: data.setId });
+    if (type === 'now' && !data) setAmbient(null);
     if (type === 'indexer' && !data) return;
     for (const fn of listeners.get(type) || []) {
       try { fn(data); } catch (e) { console.error(e); }
     }
   };
-  for (const t of ['tosu', 'now', 'indexer', 'score', 'result', 'attempt', 'profile']) es.addEventListener(t, dispatch(t));
+  for (const t of ['tosu', 'now', 'nowpp', 'indexer', 'score', 'result', 'attempt', 'profile']) es.addEventListener(t, dispatch(t));
   es.onerror = () => setDot('tosu', 'bad', 'сервер?');
   es.onopen = () => refreshStatus();
 }
 
-refreshStatus();
+document.getElementById('quit-app').addEventListener('click', async () => {
+  if (!confirm('Закрыть MapVault? Все данные сохранены. Запущенный им tosu тоже закроется.')) return;
+  try { await api('/api/shutdown', { method: 'POST' }); } catch { /* сервер уже закрывается */ }
+  document.body.innerHTML = '<div class="empty" style="grid-column:1/-1;margin-top:20vh;font-size:18px">MapVault закрыт. Запустите его снова из меню «Пуск», чтобы продолжить.</div>';
+});
+
+refreshStatus().then(() => {
+  const n = ctx.status?.nowPp;
+  if (n) setAmbient({ md5: n.md5, local: n.local, setId: n.setId });
+});
 setInterval(refreshStatus, 15000);
 connectEvents();
 renderRoute();

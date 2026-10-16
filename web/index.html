@@ -5,24 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MapVault</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <!-- Шрифты подгружаются из интернета; без него используются системные. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <div id="ambient"></div>
+  <div id="ambient-img"></div>
   <aside class="sidebar">
     <div class="brand"><span class="logo">◆</span> MapVault</div>
     <nav>
-      <a href="/" data-nav>Обзор</a>
-      <a href="/profile" data-nav>Профиль</a>
-      <a href="/maps" data-nav>Карты</a>
-      <a href="/pp" data-nav>PP-калькулятор</a>
-      <a href="/farm" data-nav>Farm</a>
-      <a href="/settings" data-nav>Настройки</a>
+      <a href="/" data-nav><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Обзор</span></a>
+      <a href="/profile" data-nav><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>Профиль</span></a>
+      <a href="/maps" data-nav><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Карты</span></a>
+      <a href="/pp" data-nav><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 7h6M9 12h1M14 12h1M9 16h1M14 16h1"/></svg><span>PP-калькулятор</span></a>
+      <a href="/farm" data-nav><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg><span>Farm</span></a>
+      <a href="/settings" data-nav><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Настройки</span></a>
     </nav>
     <div class="conn" id="conn">
       <div><span class="dot" id="dot-tosu"></span>Tosu <span class="muted" id="st-tosu">—</span></div>
       <div><span class="dot" id="dot-api"></span>osu! API <span class="muted" id="st-api">—</span></div>
       <div><span class="dot" id="dot-songs"></span>Songs <span class="muted" id="st-songs">—</span></div>
     </div>
+    <button class="quit" id="quit-app" title="MapVault работает в фоне без окна — выйти можно здесь">⏻ Выйти из MapVault</button>
   </aside>
   <main id="view"></main>
   <div id="toasts"></div>

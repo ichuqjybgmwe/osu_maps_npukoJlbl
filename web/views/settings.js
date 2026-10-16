@@ -18,16 +18,20 @@ export async function settingsView(el, _p, ctx) {
       </div>
 
       <div class="card"><h2>Tosu</h2>
-        <label class="row small"><input type="checkbox" id="tosuEnabled" ${s.tosuEnabled ? 'checked' : ''}> Подключаться к Tosu</label>
+        <label class="field">Путь к tosu.exe<input id="tosuPath" value="${s.tosuPath || ''}" placeholder="C:\\Users\\…\\Downloads\\tosu\\tosu.exe"></label>
+        <div class="row mt"><button id="findTosu">Найти tosu</button><button id="launchTosu">Запустить сейчас</button><span class="small muted" id="tosu-find-res"></span></div>
+        <label class="row mt small"><input type="checkbox" id="tosuAutostart" ${s.tosuAutostart ? 'checked' : ''}> Запускать tosu вместе с MapVault — <b>скрыто, без чёрного окна</b> (и закрывать при выходе)</label>
+        <label class="row mt small"><input type="checkbox" id="tosuEnabled" ${s.tosuEnabled ? 'checked' : ''}> Подключаться к tosu</label>
         <label class="field mt">Адрес WebSocket<input id="tosuUrl" value="${s.tosuUrl}"></label>
-        <div class="kv mt small"><div>Состояние</div><div id="tosu-state">${status.tosu.state}</div><div>Клиент</div><div>${status.tosu.client || '—'}</div><div>Кадров получено</div><div>${fmt.num(status.tosu.frames)}</div><div>Ошибка</div><div>${status.tosu.lastError || '—'}</div></div>
-        <div class="small muted mt">Tosu — программа, которая читает память osu! и отдаёт данные игры. Скачать: <a href="https://github.com/tosuapp/tosu/releases" target="_blank" rel="noopener">github.com/tosuapp/tosu</a>. Запустите tosu.exe до или после MapVault — подключение восстанавливается само.</div>
+        <div class="kv mt small"><div>Состояние</div><div id="tosu-state">${status.tosu.state}</div><div>Клиент</div><div>${status.tosu.client || '—'}</div><div>Запущен MapVault</div><div>${status.tosuLauncher?.startedByUs ? `да (pid ${status.tosuLauncher.pid})` : status.tosuLauncher?.running ? 'нет — уже был запущен' : 'нет'}</div><div>Ошибка</div><div>${status.tosu.lastError || status.tosuLauncher?.lastError || '—'}</div></div>
+        <div class="small muted mt">Tosu читает данные из osu!. Скачать: <a href="https://github.com/tosuapp/tosu/releases" target="_blank" rel="noopener">github.com/tosuapp/tosu</a>. Если tosu уже открыт со своим окном — закройте его, MapVault запустит его сам без окна.</div>
       </div>
 
       <div class="card"><h2>osu! API</h2>
         <ol class="small muted" style="padding-left:18px;margin-top:0">
           <li>Откройте <a href="https://osu.ppy.sh/home/account/edit#oauth" target="_blank" rel="noopener">osu.ppy.sh → Настройки → OAuth</a> → «New OAuth Application».</li>
-          <li>Название любое, Application Callback URL: <span class="mono" style="color:var(--text)">${redirect.redirectUri}</span></li>
+          <li>Название любое. В поле <b>Application Callback URLs</b> вставьте ровно этот адрес:
+            <div class="copy-box mt"><code id="cb-url">${redirect.redirectUri}</code><button id="copy-cb">Скопировать</button></div></li>
           <li>Скопируйте Client ID и Client Secret сюда и сохраните.</li>
           <li>Нажмите «Войти через osu!» (или просто укажите ник — тогда доступны только публичные данные).</li>
         </ol>
@@ -38,6 +42,12 @@ export async function settingsView(el, _p, ctx) {
           ${status.osuApi.loggedIn ? html`<span class="pill good">Вход выполнен${status.osuApi.user ? `: ${status.osuApi.user.username}` : ''}</span><button id="logout">Выйти</button>` : html`<a href="/api/osu/login"><button ${status.osuApi.configured ? '' : 'disabled'}>Войти через osu!</button></a>`}
         </div>
         ${status.osuApi.lastError ? html`<div class="notice bad mt small">${status.osuApi.lastError}</div>` : ''}
+        <details class="more"><summary>osu! пишет «invalid_client / Client authentication failed» при входе?</summary>
+          <div class="small muted mt">Это значит, что <b>Callback URL</b> в вашем приложении на osu.ppy.sh не совпадает с адресом выше.
+          Откройте <a href="https://osu.ppy.sh/home/account/edit#oauth" target="_blank" rel="noopener">настройки OAuth</a> → ваше приложение → Edit,
+          вставьте адрес кнопкой «Скопировать» (без пробелов, с <span class="mono">http://</span>, <span class="mono">localhost</span> и портом) и сохраните.
+          Если меняли порт MapVault — адрес тоже меняется. Без входа всё равно работают профиль, top plays и Farm — достаточно указать ник.</div>
+        </details>
         <div class="small muted mt">Ключи хранятся только локально, в базе MapVault. Лимит API — около 60 запросов в минуту, MapVault соблюдает его сам.</div>
       </div>
 
@@ -74,6 +84,8 @@ export async function settingsView(el, _p, ctx) {
     songsDir: el.querySelector('#songsDir').value || null,
     autoScanOnStart: el.querySelector('#autoScanOnStart').checked,
     tosuEnabled: el.querySelector('#tosuEnabled').checked,
+    tosuPath: el.querySelector('#tosuPath').value,
+    tosuAutostart: el.querySelector('#tosuAutostart').checked,
     tosuUrl: el.querySelector('#tosuUrl').value,
     clientId: el.querySelector('#clientId').value,
     clientSecret: el.querySelector('#clientSecret').value,
@@ -103,6 +115,34 @@ export async function settingsView(el, _p, ctx) {
       }
     } catch (e) {
       out.textContent = e.message;
+    }
+  });
+  el.querySelector('#copy-cb').addEventListener('click', async (e) => {
+    try {
+      await navigator.clipboard.writeText(redirect.redirectUri);
+      e.target.textContent = 'Скопировано ✓';
+    } catch {
+      const r = document.createRange();
+      r.selectNodeContents(el.querySelector('#cb-url'));
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      e.target.textContent = 'Выделено — Ctrl+C';
+    }
+  });
+  el.querySelector('#findTosu').addEventListener('click', async () => {
+    const out = el.querySelector('#tosu-find-res');
+    out.textContent = 'Ищу…';
+    const r = await api('/api/tosu/find', { method: 'POST' });
+    if (r.found) el.querySelector('#tosuPath').value = r.path;
+    out.textContent = r.found ? 'Найден ✓' : 'Не найден — укажите путь вручную (папка, куда распаковали tosu).';
+  });
+  el.querySelector('#launchTosu').addEventListener('click', async () => {
+    try {
+      await save();
+      const r = await api('/api/tosu/launch', { method: 'POST' });
+      toast(r.lastError ? r.lastError : r.startedByUs ? 'tosu запущен в фоне' : r.running ? 'tosu уже запущен' : 'Включите автозапуск и укажите путь к tosu.exe', r.lastError ? 'bad' : '');
+    } catch (err) {
+      toast(err.message, 'bad');
     }
   });
   const scan = (force) => async () => {
